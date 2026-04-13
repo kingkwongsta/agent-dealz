@@ -1,32 +1,40 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { SearchForm } from "@/components/SearchForm";
+import { SearchHistory } from "@/components/SearchHistory";
+import { ResultsTable } from "@/components/ResultsTable";
+import { PriceChart } from "@/components/PriceChart";
 import { startSearch, getSearch, type SearchResponse } from "@/lib/api";
 
 export default function Home() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const pollForResults = useCallback(async (searchId: string) => {
-    const maxAttempts = 60;
-    for (let i = 0; i < maxAttempts; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
-      try {
-        const data = await getSearch(searchId);
-        setSearchResult(data);
-        if (data.status === "completed" || data.status === "failed") {
-          setIsLoading(false);
-          return;
+  const pollForResults = useCallback(
+    async (searchId: string) => {
+      const maxAttempts = 60;
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        try {
+          const data = await getSearch(searchId);
+          setSearchResult(data);
+          if (data.status === "completed" || data.status === "failed") {
+            setIsLoading(false);
+            return;
+          }
+        } catch {
+          // keep polling
         }
-      } catch {
-        // keep polling
       }
-    }
-    setIsLoading(false);
-    setError("Search timed out. Please try again.");
-  }, []);
+      setIsLoading(false);
+      setError("Search timed out. Please try again.");
+    },
+    []
+  );
 
   const handleSearch = useCallback(
     async (query: string) => {
@@ -57,11 +65,11 @@ export default function Home() {
 
   return (
     <main className="flex-1 flex flex-col items-center px-4 py-12">
-      <div className="w-full max-w-4xl space-y-8">
+      <div className="w-full max-w-4xl space-y-10">
         <div className="text-center space-y-3">
           <h1 className="text-4xl font-bold tracking-tight">Agent Dealz</h1>
-          <p className="text-muted-foreground text-lg">
-            AI-powered price research — find the best deal on any product
+          <p className="text-muted-foreground text-lg max-w-lg mx-auto">
+            AI-powered price research — find the best deal on any product across the web
           </p>
         </div>
 
@@ -76,85 +84,51 @@ export default function Home() {
         )}
 
         {searchResult && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl font-semibold">
-                Results for &ldquo;{searchResult.query}&rdquo;
-              </h2>
-              <StatusBadge status={searchResult.status} />
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold">
+                  Results for &ldquo;{searchResult.query}&rdquo;
+                </h2>
+                <StatusBadge status={searchResult.status} />
+              </div>
+              {searchResult.status === "completed" && (
+                <button
+                  onClick={() => router.push(`/search/${searchResult.search_id}`)}
+                  className="text-sm text-primary hover:underline underline-offset-4"
+                >
+                  Full details &rarr;
+                </button>
+              )}
             </div>
 
-            {searchResult.status === "running" && (
-              <div className="flex items-center gap-3 text-muted-foreground py-8 justify-center">
+            {(searchResult.status === "running" || searchResult.status === "pending") && (
+              <div className="flex items-center gap-3 text-muted-foreground py-12 justify-center">
                 <Spinner />
                 <span>Agent is researching prices across retailers...</span>
               </div>
             )}
 
-            {searchResult.status === "completed" && searchResult.results.length > 0 && (
-              <div className="rounded-lg border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/50 border-b">
-                      <th className="text-left p-3 font-medium">Retailer</th>
-                      <th className="text-left p-3 font-medium">Price</th>
-                      <th className="text-left p-3 font-medium">Condition</th>
-                      <th className="text-left p-3 font-medium">In Stock</th>
-                      <th className="text-left p-3 font-medium">Link</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {searchResult.results
-                      .sort((a, b) => a.price - b.price)
-                      .map((result, i) => (
-                        <tr
-                          key={i}
-                          className={`border-b last:border-0 ${i === 0 ? "bg-green-50 dark:bg-green-950/20" : ""}`}
-                        >
-                          <td className="p-3 font-medium">
-                            {result.retailer_name}
-                            {i === 0 && (
-                              <span className="ml-2 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-0.5 rounded-full">
-                                Best Deal
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3 font-mono font-semibold">
-                            ${result.price.toFixed(2)}
-                          </td>
-                          <td className="p-3 capitalize">{result.condition}</td>
-                          <td className="p-3">
-                            {result.in_stock ? (
-                              <span className="text-green-600">Yes</span>
-                            ) : (
-                              <span className="text-red-500">No</span>
-                            )}
-                          </td>
-                          <td className="p-3">
-                            {result.url ? (
-                              <a
-                                href={result.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary underline underline-offset-4 hover:text-primary/80"
-                              >
-                                View
-                              </a>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+            {searchResult.status === "completed" && searchResult.best_price != null && (
+              <div className="rounded-lg border bg-green-50 dark:bg-green-950/20 p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Best Price Found</p>
+                  <p className="text-3xl font-bold font-mono text-green-600 dark:text-green-400">
+                    ${searchResult.best_price.toFixed(2)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">at</p>
+                  <p className="text-lg font-semibold">{searchResult.best_retailer}</p>
+                </div>
               </div>
             )}
 
-            {searchResult.status === "completed" && searchResult.results.length === 0 && (
-              <p className="text-muted-foreground text-center py-8">
-                No price results found. Try a more specific product name.
-              </p>
+            {searchResult.status === "completed" && (
+              <>
+                <PriceChart results={searchResult.results} />
+                <ResultsTable results={searchResult.results} />
+              </>
             )}
 
             {searchResult.status === "failed" && (
@@ -162,6 +136,12 @@ export default function Home() {
                 Search failed. Please try again.
               </p>
             )}
+          </div>
+        )}
+
+        {!searchResult && (
+          <div className="pt-4">
+            <SearchHistory />
           </div>
         )}
       </div>
