@@ -20,6 +20,10 @@ from app.models import (
 from app.db import create_search, update_search_status, store_results, get_search, get_search_history
 from app.agent import run_price_search
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
