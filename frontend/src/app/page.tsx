@@ -6,6 +6,7 @@ import { SearchForm } from "@/components/SearchForm";
 import { SearchHistory } from "@/components/SearchHistory";
 import { ResultsTable } from "@/components/ResultsTable";
 import { PriceChart } from "@/components/PriceChart";
+import { AgentProgressLog } from "@/components/AgentProgressLog";
 import { startSearch, getSearch, type SearchResponse } from "@/lib/api";
 
 export default function Home() {
@@ -103,10 +104,10 @@ export default function Home() {
             </div>
 
             {(searchResult.status === "running" || searchResult.status === "pending") && (
-              <div className="flex items-center gap-3 text-muted-foreground py-12 justify-center">
-                <Spinner />
-                <span>Agent is researching prices across retailers...</span>
-              </div>
+              <AgentProgressLog
+                searchId={searchResult.search_id}
+                onComplete={() => pollForResults(searchResult.search_id)}
+              />
             )}
 
             {searchResult.status === "completed" && searchResult.best_price != null && (

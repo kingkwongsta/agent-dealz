@@ -86,8 +86,14 @@ async def _execute_search(search_id: str, query: str) -> None:
         await create_search(search_id, query)
         _active_searches[search_id] = {"status": "running", "logs": []}
 
+        def log_callback(entry: dict):
+            if search_id in _active_searches:
+                _active_searches[search_id]["logs"].append(entry)
+
         loop = asyncio.get_event_loop()
-        raw_result = await loop.run_in_executor(None, run_price_search, query)
+        raw_result = await loop.run_in_executor(
+            None, lambda: run_price_search(query, log_callback=log_callback)
+        )
 
         raw_str = str(raw_result) if raw_result else ""
         results = _parse_agent_results(raw_str)
@@ -97,18 +103,20 @@ async def _execute_search(search_id: str, query: str) -> None:
         else:
             await update_search_status(search_id, SearchStatus.COMPLETED)
 
-        _active_searches[search_id] = {
-            "status": "completed",
-            "raw_output": raw_str,
-            "result_count": len(results),
-        }
+        _active_searches[search_id]["status"] = "completed"
+        _active_searches[search_id]["raw_output"] = raw_str
+        _active_searches[search_id]["result_count"] = len(results)
     except Exception as e:
         logger.exception(f"Search {search_id} failed: {e}")
         try:
             await update_search_status(search_id, SearchStatus.FAILED)
         except Exception:
             pass
-        _active_searches[search_id] = {"status": "failed", "error": str(e)}
+        if search_id in _active_searches:
+            _active_searches[search_id]["status"] = "failed"
+            _active_searches[search_id]["error"] = str(e)
+        else:
+            _active_searches[search_id] = {"status": "failed", "error": str(e)}
 
 
 @app.get("/health")
@@ -152,16 +160,30 @@ async def get_search_status(search_id: str):
 
 @app.get("/search/{search_id}/stream")
 async def stream_search(search_id: str):
-    """SSE endpoint that streams search progress until completion."""
+    """SSE endpoint that streams agent step logs until completion."""
     async def event_generator():
+        sent_count = 0
         while True:
-            status = _active_searches.get(search_id, {}).get("status", "unknown")
-            yield f"data: {json.dumps({'status': status})}\n\n"
+            search_data = _active_searches.get(search_id, {})
+            status = search_data.get("status", "unknown")
+            logs = search_data.get("logs", [])
+
+            while sent_count < len(logs):
+                yield f"data: {json.dumps(logs[sent_count])}\n\n"
+                sent_count += 1
+
             if status in ("completed", "failed"):
+                yield f"data: {json.dumps({'type': 'done', 'status': status})}\n\n"
                 break
+
+            yield f"data: {json.dumps({'type': 'heartbeat', 'status': status})}\n\n"
             await asyncio.sleep(2)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/history")

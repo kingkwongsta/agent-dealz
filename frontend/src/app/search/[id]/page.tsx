@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getSearch, type SearchResponse } from "@/lib/api";
 import { ResultsTable } from "@/components/ResultsTable";
 import { PriceChart } from "@/components/PriceChart";
+import { AgentProgressLog } from "@/components/AgentProgressLog";
 
 export default function SearchResultPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -75,10 +76,7 @@ export default function SearchResultPage({ params }: { params: Promise<{ id: str
             </div>
 
             {(search.status === "running" || search.status === "pending") && (
-              <div className="flex items-center gap-3 text-muted-foreground py-12 justify-center">
-                <Spinner />
-                <span>Agent is researching prices across retailers...</span>
-              </div>
+              <AgentProgressLog searchId={id} />
             )}
 
             {search.status === "completed" && search.best_price != null && (
