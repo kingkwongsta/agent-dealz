@@ -47,14 +47,8 @@ vercel --version
 gcloud auth login
 
 # Create a new project (pick a unique ID)
-gcloud projects create agent --name="Agent"
-
-# Set it as your active project
-gcloud config set project agent
-
-# If the project ID is taken, use a unique suffix:
-# gcloud projects create agent-12345 --name="Agent"
-# gcloud config set project agent-12345
+# Set your existing project as active
+gcloud config set project agent-493222
 ```
 
 ### Step 2 — Enable billing
@@ -66,7 +60,7 @@ Cloud Run and Firestore require a billing account. If you don't have one yet:
 gcloud billing accounts list
 
 # Link billing to your project (replace BILLING_ACCOUNT_ID)
-gcloud billing projects link agent --billing-account=BILLING_ACCOUNT_ID
+gcloud billing projects link agent-493222 --billing-account=BILLING_ACCOUNT_ID
 ```
 
 Or do it in the console: https://console.cloud.google.com/billing
@@ -109,7 +103,7 @@ Replace `YOUR_OPENROUTER_API_KEY` with your actual key from https://openrouter.a
 
 ```bash
 # Get your project number
-PROJECT_NUMBER=$(gcloud projects describe agent --format="value(projectNumber)")
+PROJECT_NUMBER=$(gcloud projects describe agent-493222 --format="value(projectNumber)")
 
 # Grant the Cloud Run service account access to read the secret
 gcloud secrets add-iam-policy-binding openrouter-api-key \
@@ -133,23 +127,23 @@ gcloud auth configure-docker
 cd backend
 
 # Build the image (this takes a few minutes the first time — Playwright + Chromium)
-docker build -t gcr.io/agent/agent-dealz-backend .
+docker build -t gcr.io/agent-493222/agent-dealz-backend .
 
 # Push to Google Container Registry
-docker push gcr.io/agent/agent-dealz-backend
+docker push gcr.io/agent-493222/agent-dealz-backend
 ```
 
 If you're on Apple Silicon (M1/M2/M3/M4), build for linux/amd64:
 
 ```bash
-docker build --platform linux/amd64 -t gcr.io/agent/agent-dealz-backend .
+docker build --platform linux/amd64 -t gcr.io/agent-493222/agent-dealz-backend .
 ```
 
 ### Step 9 — Deploy to Cloud Run
 
 ```bash
 gcloud run deploy agent-dealz-backend \
-  --image gcr.io/agent/agent-dealz-backend \
+  --image gcr.io/agent-493222/agent-dealz-backend \
   --region us-central1 \
   --platform managed \
   --memory 2Gi \
@@ -159,7 +153,7 @@ gcloud run deploy agent-dealz-backend \
   --min-instances 0 \
   --max-instances 3 \
   --allow-unauthenticated \
-  --set-env-vars "GCP_PROJECT_ID=agent" \
+  --set-env-vars "GCP_PROJECT_ID=agent-493222" \
   --update-secrets "OPENROUTER_API_KEY=openrouter-api-key:latest"
 ```
 
@@ -221,7 +215,7 @@ Once everything above is set up, future deploys are a single command:
 
 ```bash
 # From the repo root
-GCP_PROJECT_ID=agent ./deploy.sh
+GCP_PROJECT_ID=agent-493222 ./deploy.sh
 ```
 
 This builds, pushes, and deploys the backend. For the frontend:
@@ -237,8 +231,8 @@ cd frontend && vercel --prod
 ### "Permission denied" on Cloud Run
 ```bash
 # Make sure the default compute service account has Firestore access
-PROJECT_NUMBER=$(gcloud projects describe agent --format="value(projectNumber)")
-gcloud projects add-iam-policy-binding agent \
+PROJECT_NUMBER=$(gcloud projects describe agent-493222 --format="value(projectNumber)")
+gcloud projects add-iam-policy-binding agent-493222 \
   --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
   --role="roles/datastore.user"
 ```
@@ -246,7 +240,7 @@ gcloud projects add-iam-policy-binding agent \
 ### Docker build fails on Apple Silicon
 ```bash
 # Always use --platform linux/amd64 for Cloud Run
-docker build --platform linux/amd64 -t gcr.io/agent/agent-dealz-backend backend/
+docker build --platform linux/amd64 -t gcr.io/agent-493222/agent-dealz-backend backend/
 ```
 
 ### Firestore "database not found"
